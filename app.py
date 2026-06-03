@@ -12,6 +12,9 @@ from docx import Document
 # LOGO URL
 LOGO_URL = "https://z-cdn-media.chatglm.cn/files/97efb701-480f-41e8-a54d-d828ce634224.jpeg?auth_key=1880000279-e3e53963895d4cb2b17766ad29dd2480-0-3f2ced5648a41f4923250c661dc275fd"
 
+# HEDEF MAİL ADRESİ
+ADMIN_EMAIL = "doktorv333@gmail.com"
+
 def extract_file_text(uploaded_file):
     text = ""
     if uploaded_file is not None:
@@ -29,23 +32,31 @@ def extract_file_text(uploaded_file):
         except Exception as e: st.error(f"⚠️ Error reading file: {e}")
     return text
 
-# Streamlit Cloud dosya sisteminde kayıp olmaması için istatistikleri session_state'te tutuyoruz
+# İstatistikler hafızada tutuluyor
 if "global_stats" not in st.session_state:
     st.session_state.global_stats = {"visits": 0, "analyses": 0, "scams": 0}
 
-def load_stats():
-    return st.session_state.global_stats
-
-def save_stats(stats):
-    st.session_state.global_stats = stats
+def load_stats(): return st.session_state.global_stats
+def save_stats(stats): st.session_state.global_stats = stats
 
 if "visit_counted" not in st.session_state:
-    st.session_state.visit_counted = True
-    stats = load_stats(); stats["visits"] += 1; save_stats(stats)
+    st.session_state.visit_counted = True; stats = load_stats(); stats["visits"] += 1; save_stats(stats)
 
-if "analysis_count" not in st.session_state: st.session_state.analysis_count = 0
-if "unlocked" not in st.session_state: st.session_state.unlocked = False
-if "lock_time" not in st.session_state: st.session_state.lock_time = None
+# --- SAYFA YENİLENİNCE SIFIRLANMAMASI İÇİN URL PARAMETRESİ KULLANIMI ---
+if "analysis_count" not in st.session_state:
+    # URL'de count varsa onu al, yoksa 0 başlat
+    if "count" in st.query_params:
+        try: st.session_state.analysis_count = int(st.query_params["count"])
+        except: st.session_state.analysis_count = 0
+    else:
+        st.session_state.analysis_count = 0
+        st.query_params["count"] = "0"
+
+if "unlocked" not in st.session_state:
+    if "unlock" in st.query_params and st.query_params["unlock"] == "true":
+        st.session_state.unlocked = True
+    else:
+        st.session_state.unlocked = False
 
 SYSTEM_PROMPT = """You are Ghost Job Detector AI v2 & Career Copilot. You must output ALL TEXT IN ENGLISH. Respond with ONLY a valid JSON object. No markdown backticks:
 {
@@ -76,19 +87,15 @@ POLICY_TEXT = """
 **Terms of Service & Privacy Policy**
 
 **1. Acceptance of Terms**
-By accessing this platform, you agree to be bound by these Terms. If you do not agree, do not use the platform.
+By accessing this platform, you agree to be bound by these Terms.
 
 **2. Intellectual Property & Copyrights**
-All rights, intellectual property (IP) rights, algorithms, and underlying code belong exclusively to **Welid Almansor**. 
-This application is developed by **GJ.AI (Great Job AI) Company**, and all copyrights are strictly reserved by GJ.AI. Unauthorized reproduction is prohibited.
+All rights, IP, algorithms, and code belong exclusively to **Welid Almansor / GJ.AI Company**.
 
 **3. Logo & Trademark Protection**
-The GJ.AI logo is 100% owned by GJ.AI (Great Job AI Company). Any unauthorized use, reproduction, or distribution of the logo in any context is strictly prohibited. GJ.AI reserves the full legal right to open a lawsuit and take legal action against any individual or entity that uses the logo without explicit written permission.
+The GJ.AI logo is 100% owned. Unauthorized use is strictly prohibited and subject to lawsuit.
 
-**4. Use of the Service**
-The Service provides AI-generated probabilistic analysis for informational purposes only.
-
-**5. Privacy & Data Handling**
+**4. Privacy & Data Handling**
 Job postings and CVs are processed securely and not permanently stored.
 
 By checking the box below, you confirm your agreement.
@@ -105,6 +112,7 @@ if not st.session_state.policy_accepted:
     if st.button("🔓 Access Platform", disabled=not agreed, type="primary", use_container_width=True): st.session_state.policy_accepted = True; st.rerun()
 else:
     st.markdown("<h1 style='text-align: center; color: #FFFFFF;'>👻 EYE Ghost Job AI</h1><p style='text-align: center; color: #AAAAAA;'>Detect scams, analyze legitimacy, and match your CV.</p><hr style='border: 1px solid #333333;'>", unsafe_allow_html=True)
+    
     with st.sidebar:
         st.image(LOGO_URL, use_container_width=True); st.markdown("---")
         st.header("⚙️ Settings"); api_key_input = st.text_input("Groq API Key (Free)", type="password")
@@ -113,6 +121,37 @@ else:
         st.header("🕵️ External Evidence (Optional)"); external_evidence = st.text_area("Company news, links, etc.", height=100)
         st.markdown("---"); st.header("📈 Platform Statistics"); current_stats = load_stats()
         st.metric("👥 Total Visitors", current_stats["visits"]); st.metric("🔍 Analyses Performed", current_stats["analyses"]); st.metric("🚨 Scams/Ghost Jobs Detected", current_stats["scams"])
+        
+        # --- YORUM VE FEEDBACK BÖLÜMÜ ---
+        st.markdown("---")
+        st.header("💬 Feedback & Comments")
+        st.write("We value your feedback! Write a comment to unlock unlimited access.")
+        with st.form("comment_form"):
+            user_email = st.text_input("✉️ Your Email (Required)")
+            user_comment = st.text_area("📝 Your Comment / Feedback", height=100)
+            submit_comment = st.form_submit_button("📩 Send Comment & Unlock")
+            
+            if submit_comment:
+                if user_email.strip() and "@" in user_email and user_comment.strip():
+                    try:
+                        # Maili doktorv333@gmail.com adresine gönderiyoruz
+                        requests.post(f"https://formsubmit.co/ajax/{ADMIN_EMAIL}", data={
+                            "email": user_email.strip(), 
+                            "subject": "New Ghost Job AI Feedback",
+                            "message": user_comment.strip()
+                        })
+                        st.session_state.unlocked = True
+                        st.query_params["unlock"] = "true" # URL'ye de kaydet
+                        st.success("✅ Comment sent! You are now unlocked. Refreshing...")
+                        time.sleep(1.5)
+                        st.rerun()
+                    except:
+                        # Api çökerse bile kullanıcıyı kilitleme
+                        st.session_state.unlocked = True
+                        st.warning("Could not send email, but you are unlocked!")
+                else:
+                    st.error("⚠️ Please enter a valid email and write a comment to unlock.")
+
         st.markdown("---")
         if st.button("🔒 Revoke Policy Consent"): st.session_state.policy_accepted = False; st.rerun()
 
@@ -130,8 +169,7 @@ else:
 
     with col2:
         st.subheader("📊 Analysis Report"); count = st.session_state.analysis_count; is_unlocked = st.session_state.unlocked
-        if count >= 5 and not is_unlocked and st.session_state.lock_time:
-            if time.time() - st.session_state.lock_time >= 86400: st.session_state.unlocked = True; is_unlocked = True
+        
         if is_unlocked: st.info("💎 **Premium Access:** Unlimited analyses!")
         elif count < 5: st.info(f"💡 You have **{5 - count}** free analyses left.")
         
@@ -139,15 +177,9 @@ else:
         elif analyze_btn and not job_post.strip(): st.warning("⚠️ Please paste a job post.")
         elif analyze_btn:
             if count >= 5 and not is_unlocked:
-                if st.session_state.lock_time is None: st.session_state.lock_time = time.time()
-                st.error("🚫 **Free Limit Reached!**"); st.markdown("---")
-                st.info("📧 Send feedback to **velitgone31@gmail.com** to unlock!")
-                with st.form("unlock_form"):
-                    user_email = st.text_input("✉️ Email used for feedback:"); submit_email = st.form_submit_button("🔓 Unlock Instantly")
-                    if submit_email and user_email.strip() and "@" in user_email:
-                        try: requests.post("https://formsubmit.co/ajax/velitgone31@gmail.com", data={"email": user_email.strip(), "message": "Unlocked"})
-                        except: pass
-                        st.session_state.unlocked = True; st.success("✅ Unlocked!"); st.rerun()
+                st.error("🚫 **Free Limit Reached!**")
+                st.markdown("---")
+                st.warning("📢 **To get unlimited access, please write a comment/feedback in the sidebar.** Your email is required, and the comment will be sent to our team for review. Once submitted, you are instantly unlocked!")
             else:
                 final_cv_text = cv_file_text if (uploaded_cv and cv_file_text.strip()) else cv_text_manual
                 user_message = f"JOB POST TO ANALYZE:\n\n{job_post}"
@@ -158,9 +190,15 @@ else:
                         client = Groq(api_key=api_key_input)
                         raw_response = client.chat.completions.create(messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_message}], model="llama-3.3-70b-versatile", temperature=0.1, max_tokens=4096).choices[0].message.content
                         data = extract_json(raw_response); v_emoji = data.get("verdict_emoji", "⚪"); v_label = data.get("verdict_label", "Unknown")
-                        st.session_state.analysis_count += 1; stats = load_stats(); stats["analyses"] += 1
+                        
+                        # Hakkı düşür ve URL'ye yaz (Yenilenince sıfırlanmasın diye)
+                        st.session_state.analysis_count += 1
+                        st.query_params["count"] = str(st.session_state.analysis_count)
+                        
+                        stats = load_stats(); stats["analyses"] += 1
                         if "Scam" in v_label or "Ghost" in v_label: stats["scams"] += 1
                         save_stats(stats)
+                        
                         if "🟢" in v_emoji: st.success(f"**VERDICT: {v_emoji} {v_label}**")
                         elif "🟡" in v_emoji: st.warning(f"**VERDICT: {v_emoji} {v_label}**")
                         elif "🟠" in v_emoji: st.error(f"**VERDICT: {v_emoji} {v_label}**")
