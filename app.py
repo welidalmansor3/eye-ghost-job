@@ -44,7 +44,6 @@ if "visit_counted" not in st.session_state:
 
 # --- SAYFA YENİLENİNCE SIFIRLANMAMASI İÇİN URL PARAMETRESİ KULLANIMI ---
 if "analysis_count" not in st.session_state:
-    # URL'de count varsa onu al, yoksa 0 başlat
     if "count" in st.query_params:
         try: st.session_state.analysis_count = int(st.query_params["count"])
         except: st.session_state.analysis_count = 0
@@ -134,7 +133,6 @@ else:
             if submit_comment:
                 if user_email.strip() and "@" in user_email and user_comment.strip():
                     try:
-                        # Maili doktorv333@gmail.com adresine gönderiyoruz
                         requests.post(f"https://formsubmit.co/ajax/{ADMIN_EMAIL}", data={
                             "email": user_email.strip(), 
                             "subject": "New Ghost Job AI Feedback",
@@ -146,7 +144,6 @@ else:
                         time.sleep(1.5)
                         st.rerun()
                     except:
-                        # Api çökerse bile kullanıcıyı kilitleme
                         st.session_state.unlocked = True
                         st.warning("Could not send email, but you are unlocked!")
                 else:
@@ -191,7 +188,7 @@ else:
                         raw_response = client.chat.completions.create(messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_message}], model="llama-3.3-70b-versatile", temperature=0.1, max_tokens=4096).choices[0].message.content
                         data = extract_json(raw_response); v_emoji = data.get("verdict_emoji", "⚪"); v_label = data.get("verdict_label", "Unknown")
                         
-                        # Hakkı düşür ve URL'ye yaz (Yenilenince sıfırlanmasın diye)
+                        # Hakkı düşür ve URL'ye yaz
                         st.session_state.analysis_count += 1
                         st.query_params["count"] = str(st.session_state.analysis_count)
                         
@@ -209,13 +206,29 @@ else:
                         if "Safe" in action: st.success(f"**Recommended Action:** Safe to Apply")
                         elif "Caution" in action: st.warning(f"**Recommended Action:** Apply with Caution")
                         else: st.error(f"**Recommended Action:** Investigate Further / Avoid")
+                        
+                        # --- DELTA GENERATOR HATASI DÜZELTİLDİ ---
                         if final_cv_text.strip() and data.get("match_score", 0) > 0:
                             st.markdown("---"); st.subheader("🤝 CV Match Analysis"); st.metric("🎯 Job Match Score", f"%{data.get('match_score')}")
                             mc, ms = st.columns(2)
-                            with mc: st.markdown("### ✅ Skills You Have"); [st.success(f"✔️ {s}") for s in data.get("matching_skills", [])]
-                            with ms: st.markdown("### ❌ Skills Missing"); [st.error(f"❌ {s}") for s in data.get("missing_skills", [])]
+                            with mc: 
+                                st.markdown("### ✅ Skills You Have")
+                                for s in data.get("matching_skills", []):
+                                    st.success(f"✔️ {s}")
+                            with ms: 
+                                st.markdown("### ❌ Skills Missing")
+                                for s in data.get("missing_skills", []):
+                                    st.error(f"❌ {s}")
+                                    
                         st.markdown("---"); cr, cp = st.columns(2)
-                        with cr: st.markdown("### 🚩 Key Risk Factors"); [st.markdown(f"- {r}") for r in data.get("key_risk_factors", [])]
-                        with cp: st.markdown("### ✨ Positive Signals"); [st.markdown(f"- {p}") for p in data.get("positive_signals", [])]
+                        with cr: 
+                            st.markdown("### 🚩 Key Risk Factors")
+                            for r in data.get("key_risk_factors", []):
+                                st.markdown(f"- {r}")
+                        with cp: 
+                            st.markdown("### ✨ Positive Signals")
+                            for p in data.get("positive_signals", []):
+                                st.markdown(f"- {p}")
+                                
                         st.markdown("### 🧠 Final Reasoning"); st.write(data.get("final_reasoning"))
                     except Exception as e: st.error(f"🚫 Error: {str(e)}")
